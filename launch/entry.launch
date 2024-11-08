@@ -1,0 +1,7 @@
+<launch>
+    <!-- launch simulation in ariac -->
+    <include file="$(find ecse_373_ariac)/launch/ecse_373_ariac.launch"/>
+
+    <!-- launch the node of competition -->
+    <node name="start_competition_node" pkg="ariac_entry" type="start_competition_node" output="screen"/>
+</launch>
