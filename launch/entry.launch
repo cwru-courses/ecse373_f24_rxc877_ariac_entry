@@ -1,7 +1,10 @@
 <launch>
+
     <!-- launch simulation in ariac -->
     <include file="$(find ecse_373_ariac)/launch/ecse_373_ariac.launch"/>
 
+    <include file="$(find ik_service)/launch/ik_service.launch"/>
+
     <!-- launch the node of competition -->
-    <node name="start_competition_node" pkg="ariac_entry" type="start_competition_node" output="screen"/>
+    <node pkg="ariac_entry" name="competition_controller_node"  type="competition_controller_node" output="screen"/>
 </launch>

@@ -136,7 +136,7 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/ariac_entry_node.cpp)
-add_executable(start_competition_node src/start_competition_client.cpp)
+add_executable(competition_controller_node src/competition_controller_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -152,11 +152,11 @@ add_executable(start_competition_node src/start_competition_client.cpp)
 # target_link_libraries(${PROJECT_NAME}_node
 #   ${catkin_LIBRARIES}
 # )
-target_link_libraries(start_competition_node
+target_link_libraries(competition_controller_node
   ${catkin_LIBRARIES}
 )
-add_dependencies(start_competition_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS}
-)
+#add_dependencies(competition_controller_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS}
+#)
 #############
 ## Install ##
 #############
