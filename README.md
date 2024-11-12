@@ -10,6 +10,7 @@ Before using the package, ensure that you have the following dependencies instal
 - ROS Noetic
 - Gazebo (for simulation)
 - ecse_373_ariac
+- ik_service 
   
 
 ## Installation
