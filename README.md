@@ -20,19 +20,19 @@ The ARIAC 2019 Lab package provides the tools necessary for simulating in a ware
 
 ## Installation of Dependencies
 
-  # Add the GPG key and OSRF repository for Gazebo and ARIAC
+  **Add the GPG key and OSRF repository for Gazebo and ARIAC**
   ```bush 
   wget https://packages.osrfoundation.org/gazebo.key -O - | sudo apt-key add -
   sudo sh -c 'echo "deb http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" > /etc/    apt/sources.list.d/gazebo-stable.list'
   sudo apt-get update
   ```
 
-  # Install the required ROS packages
+  **Install the required ROS packages**
   ```bush
   sudo apt installros-noetic-osrf-gear ros-noetic-cwru-ecse-373 ros-noetic-joint-state-controller ros-noetic-       effort-controllers ros-noetic-position-controllers
   ```
 
-  Update the enviroment 
+  **Update the enviroment**
   ```bush
   sudo update
   ```
