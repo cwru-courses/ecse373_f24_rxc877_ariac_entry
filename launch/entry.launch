@@ -1,7 +1,7 @@
 <launch>
-
+    <arg name="use_sim_time" default="true"/>
     <!-- launch simulation in ariac -->
-    <include file="$(find ecse_373_ariac)/launch/ecse_373_ariac.launch"/>
+    <include file="$(find ecse_373_ariac)/launch/ecse_373_ariac.launch"/> 
 
     <include file="$(find ik_service)/launch/ik_service.launch"/>
 

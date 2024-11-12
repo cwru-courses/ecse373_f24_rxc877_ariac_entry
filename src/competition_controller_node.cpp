@@ -135,14 +135,19 @@ void processOrders(ros::NodeHandle &nh) {
                     // Transformar la pose al marco del brazo
                     if (transformPartPose(bin_name, part_pose, goal_pose)) {
                         goal_pose.pose.position.z += 0.10; // Añadir 10 cm en z para evitar colisiones
-                        ik_srv.request.pose = goal_pose.pose;
+                        ik_srv.request.target_pose = goal_pose.pose;
                         
                         // Llamar al servicio IK
-                        if (ik_client.call(ik_srv) && ik_srv.response.success) {
-                            ROS_INFO("IK solution found and arm moved successfully.");
+                        if (ik_client.call(ik_srv)) {
+                            if (ik_srv.response.success) {
+                                ROS_INFO("IK solution found and arm moved successfully.");
+                            }   else {
+                                ROS_WARN("IK service call was successful, but no valid solution found.");
+                            }
                         } else {
-                            ROS_ERROR("Failed to move arm using IK service.");
+                             ROS_ERROR("Failed to call IK service.");
                         }
+
                     }
                 }
             }
@@ -157,7 +162,14 @@ void processOrders(ros::NodeHandle &nh) {
 int main(int argc, char **argv) {
     ros::init(argc, argv, "competition_controller_node");
     ros::NodeHandle nh;
-    tfListener(tfBuffer);
+    
+    //delay
+    ros::Duration(2.0).sleep();
+    
+    //declare buffer and listener
+    tf2_ros::Buffer tfBuffer;
+    tf2_ros::TransformListener tfListener(tfBuffer);
+
 
     if (!startCompetition(nh)) return 1;
 
