@@ -4,14 +4,38 @@
 The ARIAC 2019 Lab package provides the tools necessary for simulating in a warehouse environment. The package uses ROS to interact with robot models and sensors, following the rules of the ARIAC competition.
 
 ## Prerequisites
-
-Before using the package, ensure that you have the following dependencies installed:
-
-- ROS Noetic
-- Gazebo (for simulation)
-- ecse_373_ariac
-- ik_service 
   
+  Before using the package in order to run the ARIAC enviroment and UR10 robot, ensure that you have the following dependencies installed:
+  
+  - ROS Noetic
+  - roscpp
+  - rviz
+  - Gazebo (for simulation)
+  - ecse_373_ariac (ARIAC enviroment setup)
+  - ik_service (inverse kinematics service)
+  - tf2_ros and tf2_geometry_msgs
+  - ros-noetic-osrf-gear
+  - and ros-noetic-cwru-ecse-373
+
+
+## Installation of Dependencies
+
+  # Add the GPG key and OSRF repository for Gazebo and ARIAC
+  ```bush 
+  wget https://packages.osrfoundation.org/gazebo.key -O - | sudo apt-key add -
+  sudo sh -c 'echo "deb http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" > /etc/    apt/sources.list.d/gazebo-stable.list'
+  sudo apt-get update
+  ```
+
+  # Install the required ROS packages
+  ```bush
+  sudo apt installros-noetic-osrf-gear ros-noetic-cwru-ecse-373 ros-noetic-joint-state-controller ros-noetic-       effort-controllers ros-noetic-position-controllers
+  ```
+
+  Update the enviroment 
+  ```bush
+  sudo update
+  ```
 
 ## Installation
 
@@ -22,17 +46,17 @@ Follow the steps below to install and set up the package.
     source /opt/ros/noetic/setup.bash
     source ~/ariac_ws/devel/setup.bash
     ```
-
-1. **Clone the repository**:
-
-    ```bash
-    git clone git@github.com:cwru_courses/ecse373_f24_rxc877_ariac_entry.git
-    ```
-2. **In another terminal run the roscore**:
+1. **In one terminal run the roscore**:
 
     ```bash
     roscore
     ```
+2. **Change the terminal and continue: Clone the repository**:
+
+    ```bash
+    git clone git@github.com:cwru_courses/ecse373_f24_rxc877_ariac_entry.git
+    ```
+
     
 3. **Navigate to your ROS workspace**:
 
