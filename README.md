@@ -15,6 +15,7 @@ Before using the package, ensure that you have the following dependencies instal
 ## Installation
 
 Follow the steps below to install and set up the package.
+
 0. **Open ROS noetic in two terminals**
     ```bash
     source /opt/ros/noetic/setup.bash
