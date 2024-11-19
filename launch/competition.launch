@@ -1,0 +1,90 @@
+<launch>
+
+
+
+    
+    <!-- Lanzar la cámara lógica (si es necesario) 
+    <node name="logical_camera_bin1" pkg="osrf_gear" type="logical_camera" output="screen">
+        <param name="camera_frame" value="logical_camera_bin1_frame"/>
+    </node>
+
+    <node name="logical_camera_bin2" pkg="osrf_gear" type="logical_camera" output="screen">
+        <param name="camera_frame" value="logical_camera_bin2_frame"/>
+    </node>
+
+    <node name="logical_camera_agv1" pkg="osrf_gear" type="logical_camera" output="screen">
+        <param name="camera_frame" value="logical_camera_agv1_frame"/>
+    </node>
+
+    <node name="logical_camera_agv2" pkg="osrf_gear" type="logical_camera" output="screen">
+        <param name="camera_frame" value="logical_camera_agv2_frame"/>
+    </node>
+--> 
+    <!-- Puedes agregar más cámaras según sea necesario --> 
+     
+      <!-- Arguments from ecse_373_ariac.launch -->
+    <arg name="python" default="true" doc="Whether to use the python scripts [true|false]" />
+
+    <arg name="development" default="true" doc="Whether run ARIAC in development mode [true|false]" />
+    <arg unless="$(arg development)" name="development_args" value="" />
+    <arg if="$(arg development)" name="development_args" value="--development-mode" />
+
+    <arg name="verbose" default="false" doc="Whether to run Gazebo in verbose mode [false|true]" />
+    <arg unless="$(arg verbose)" name="verbose_args" value="" />
+    <arg if="$(arg verbose)" name="verbose_args" value="--verbose" />
+
+    <arg name="state_logging" default="false" doc="Whether to keep execution logs [false|true]" />
+    <arg unless="$(arg state_logging)" name="state_logging_args" value="" />
+    <arg if="$(arg state_logging)" name="state_logging_args" value="--state-logging=true" />
+
+    <arg name="no_gui" default="false" doc="Whether to run the environment without a GUI [false|true]" />
+    <arg unless="$(arg no_gui)" name="gui_args" value="" />
+    <arg if="$(arg no_gui)" name="gui_args" value="--no-gui" />
+
+    <arg name="fill_demo_shipment" default="false" doc="Fill demo shipment [false|true]" />
+    <arg unless="$(arg fill_demo_shipment)" name="fill_demo_shipment_args" value="" />
+    <arg if="$(arg fill_demo_shipment)" name="fill_demo_shipment_args" value="--fill-demo-shipment" />
+
+
+    <arg name="world_path" default="$(find ecse_373_ariac)/worlds/gear.world" />
+    <arg name="gear_urdf_xacro" default="$(find ecse_373_ariac)/urdf/gear.urdf.xacro" />
+    <arg name="arm_urdf_dir" default="$(find ecse_373_ariac)/urdf/" />
+
+    <arg name="trial_file" default="trial_01_config.yaml" />
+    <arg name="trial" default="$(find ecse_373_ariac)/config/$(arg trial_file)" />
+    <arg name="environ_file" default="environment_config.yaml" />
+    <arg name="environ" default="$(find ecse_373_ariac)/config/$(arg environ_file)" />
+
+    <!-- Include ecse_373_ariac.launch -->
+    <include file="$(find ecse_373_ariac)/launch/ecse_373_ariac.launch">
+        <arg name="python" value="$(arg python)" />
+        <arg name="development" value="$(arg development)" />
+        <arg name="verbose" value="$(arg verbose)" />
+        <arg name="state_logging" value="$(arg state_logging)" />
+        <arg name="no_gui" value="$(arg no_gui)" />
+        <arg name="fill_demo_shipment" value="$(arg fill_demo_shipment)" />
+
+        <arg name="world_path" value="$(arg world_path)" />
+        <arg name="gear_urdf_xacro" value="$(arg gear_urdf_xacro)" />
+        <arg name="arm_urdf_dir" value="$(arg arm_urdf_dir)" />
+        <arg name="trial_file" value="$(arg trial_file)" />
+        <arg name="trial" value="$(arg trial)" />
+        <arg name="environ_file" value="$(arg environ_file)" />
+        <arg name="environ" value="$(arg environ)" />
+    </include>
+
+
+       <!-- Include the IK service -->
+    <include file="$(find ik_service)/launch/ik_service.launch" />
+
+ 
+    
+    <!-- Lanzar el nodo competition_controller_node -->
+    <node name="competition_controller_node" pkg="ariac_entry" type="competition_controller_node" output="screen">
+       
+       
+    </node>
+
+   
+    <!-- Otros nodos de servicios si son necesarios -->
+</launch>
