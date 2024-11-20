@@ -171,6 +171,8 @@ void sendTrajectory(const std::vector<std::string>& joint_names, const std::vect
     } else {
         ROS_WARN("El UR10 no pudo completar la trayectoria.");
     }
+
+    
 }
 
 void jointStatesCallback(const sensor_msgs::JointState::ConstPtr& msg) {
@@ -235,90 +237,6 @@ void publishTrajectory(const sensor_msgs::JointState& joint_states) {
     trajectory_pub.publish(joint_trajectory);
 }
 
-void moveToPoses(ros::NodeHandle &nh) {
-    // Configurar cliente del servicio IK
-    ros::ServiceClient ik_client = nh.serviceClient<ik_service::PoseIK>("pose_ik");
-    if (!ros::service::waitForService("pose_ik", ros::Duration(3.0))) {
-        ROS_ERROR("IK service 'pose_ik' is not available. Exiting...");
-        return;
-    }
-
-    // Inicializar el vector de poses
-    std::vector<geometry_msgs::Pose> poses;
-    poses.clear();
-
-    // Agregar las poses especificadas
-    geometry_msgs::Pose pose;
-    pose.orientation.w = 1.0; pose.orientation.x = 0.0; pose.orientation.y = 0.0; pose.orientation.z = 0.0;
-
-    pose.position.x = 0.75; pose.position.y = 0.0; pose.position.z = 0.95; poses.push_back(pose);
-    pose.position.x = 0.0; pose.position.y = 0.75; pose.position.z = 0.95; poses.push_back(pose);
-    pose.position.x = 0.25; pose.position.y = 0.75; pose.position.z = 0.95; poses.push_back(pose);
-    pose.position.x = 0.75; pose.position.y = 0.25; pose.position.z = 0.95; poses.push_back(pose);
-    pose.position.x = 0.75; pose.position.y = 0.45; pose.position.z = 0.75; poses.push_back(pose);
-
-    // Obtener nombres de juntas
-    std::vector<std::string> joint_names;
-    if (!getJointNames(joint_names)) {
-        ROS_ERROR("No se pudieron obtener los nombres de las juntas. Abortando.");
-        return;
-    }
-
-    for (const auto& a_pose : poses) {
-        // Preparar solicitud al servicio IK
-        ik_service::PoseIK ik_srv;
-        ik_srv.request.target_pose = a_pose;
-
-        // Llamar al servicio IK
-        if (!ik_client.call(ik_srv)) {
-            ROS_ERROR("Failed to call IK service for pose (%.2f, %.2f, %.2f)", 
-                      a_pose.position.x, a_pose.position.y, a_pose.position.z);
-            continue;
-        }
-
-        if (!ik_srv.response.success) {
-            ROS_WARN("No valid IK solution found for pose (%.2f, %.2f, %.2f)", 
-                     a_pose.position.x, a_pose.position.y, a_pose.position.z);
-            continue;
-        }
-
-        // Generar trayectoria
-        trajectory_msgs::JointTrajectory joint_trajectory;
-        joint_trajectory.joint_names = joint_names;
-
-        // Punto inicial: Estado actual del UR10
-        trajectory_msgs::JointTrajectoryPoint start_point;
-        start_point.positions = current_joint_states.position;
-        start_point.time_from_start = ros::Duration(0.0);
-
-        // Punto final: Solución IK
-        trajectory_msgs::JointTrajectoryPoint goal_point;
-        goal_point.positions = ik_srv.response.joint_solutions[0].joint_angles; // Elegir la primera solución
-        goal_point.time_from_start = ros::Duration(2.0); // 2 segundos para moverse
-
-        joint_trajectory.points.push_back(start_point);
-        joint_trajectory.points.push_back(goal_point);
-
-        // Publicar la trayectoria
-        joint_trajectory.header.stamp = ros::Time::now();
-        trajectory_pub.publish(joint_trajectory);
-
-        ROS_INFO("Published trajectory to pose (%.2f, %.2f, %.2f)", 
-                 a_pose.position.x, a_pose.position.y, a_pose.position.z);
-
-        // Esperar hasta que el UR10 esté estacionario
-        ros::Rate rate(10); // 10 Hz
-        while (ros::ok()) {
-            if (isArmStationary(current_joint_states)) {
-                ROS_INFO("UR10 has reached pose (%.2f, %.2f, %.2f)", 
-                         a_pose.position.x, a_pose.position.y, a_pose.position.z);
-                break;
-            }
-            rate.sleep();
-        }
-    }
-}
-
 
 
 // Process the orders
@@ -372,15 +290,21 @@ void processOrders(ros::NodeHandle &nh) {
                                 std::vector<double> selected_solution;
 
                                 for (const auto& solution : ik_srv.response.joint_solutions) {
+                                    // Restringir el ángulo de la junta `shoulder_lift_joint` al rango [-90°, +90°] en radianes
+                                    if (solution.joint_angles[2] < -M_PI_2 || solution.joint_angles[2] > M_PI_2) {
+                                        continue; // Ignorar soluciones fuera del rango permitido
+                                    }
+
                                     double difference = 0.0;
                                     for (size_t i = 0; i < solution.joint_angles.size(); ++i) {
                                         difference += std::abs(solution.joint_angles[i] - current_joint_states.position[i]);
                                     }
                                     if (difference < min_difference) {
                                         min_difference = difference;
-                                        selected_solution = solution.joint_angles;
+                                        selected_solution = std::vector<double>(solution.joint_angles.begin(), solution.joint_angles.end());
                                     }
                                 }
+
 
                                 // Generar la trayectoria con la solución seleccionada
                                 trajectory_msgs::JointTrajectory joint_trajectory;
@@ -419,6 +343,180 @@ void processOrders(ros::NodeHandle &nh) {
         ROS_INFO_THROTTLE(10, "Last joint state time: %.2f", last_joint_state_time.toSec());
 
         ros::Duration(0.1).sleep(); // Esperar un momento antes de iterar
+    }
+}
+
+
+// Function to create target poses
+std::vector<geometry_msgs::Pose> createTargetPoses()
+{
+    std::vector<geometry_msgs::Pose> poses;
+    poses.clear();
+
+    geometry_msgs::Pose pose;
+
+    // Pose 1
+    pose.position.x = 0.75;
+    pose.position.y = 0.0;
+    pose.position.z = 0.95;
+    pose.orientation.w = 1.0;
+    pose.orientation.x = 0.0;
+    pose.orientation.y = 0.0;
+    pose.orientation.z = 0.0;
+    poses.push_back(pose);
+
+    // Pose 2
+    pose.position.x = 0.0;
+    pose.position.y = 0.75;
+    pose.position.z = 0.95;
+    pose.orientation.w = 1.0;
+    pose.orientation.x = 0.0;
+    pose.orientation.y = 0.0;
+    pose.orientation.z = 0.0;
+    poses.push_back(pose);
+
+    // Pose 3
+    pose.position.x = 0.25;
+    pose.position.y = 0.75;
+    pose.position.z = 0.95;
+    pose.orientation.w = 1.0;
+    pose.orientation.x = 0.0;
+    pose.orientation.y = 0.0;
+    pose.orientation.z = 0.0;
+    poses.push_back(pose);
+
+    // Pose 4
+    pose.position.x = 0.75;
+    pose.position.y = 0.25;
+    pose.position.z = 0.95;
+    pose.orientation.w = 1.0;
+    pose.orientation.x = 0.0;
+    pose.orientation.y = 0.0;
+    pose.orientation.z = 0.0;
+    poses.push_back(pose);
+
+    // Pose 5
+    pose.position.x = 0.75;
+    pose.position.y = 0.45;
+    pose.position.z = 0.75;
+    pose.orientation.w = 1.0;
+    pose.orientation.x = 0.0;
+    pose.orientation.y = 0.0;
+    pose.orientation.z = 0.0;
+    poses.push_back(pose);
+
+    return poses;
+}
+
+void moveToPoses(ros::NodeHandle &nh) {
+    // Configurar cliente del servicio IK
+    ros::ServiceClient ik_client = nh.serviceClient<ik_service::PoseIK>("pose_ik");
+    if (!ros::service::waitForService("pose_ik", ros::Duration(3.0))) {
+        ROS_ERROR("IK service 'pose_ik' is not available. Exiting...");
+        return;
+    }
+
+    // Inicializar el vector de poses
+    std::vector<geometry_msgs::Pose> poses = createTargetPoses();
+    
+
+    
+    // Obtener nombres de juntas
+    std::vector<std::string> joint_names;
+    if (!getJointNames(joint_names)) {
+        ROS_ERROR("No se pudieron obtener los nombres de las juntas. Abortando.");
+        return;
+    }
+
+    for (const auto& a_pose : poses) {
+        // Preparar solicitud al servicio IK
+        ik_service::PoseIK ik_srv;
+        ik_srv.request.target_pose = a_pose;
+
+        // Llamar al servicio IK
+        if (!ik_client.call(ik_srv)) {
+            ROS_ERROR("Failed to call IK service for pose (%.2f, %.2f, %.2f)", 
+                      a_pose.position.x, a_pose.position.y, a_pose.position.z);
+            continue;
+        }
+
+        if (!ik_srv.response.success) {
+            ROS_WARN("No valid IK solution found for pose (%.2f, %.2f, %.2f)", 
+                     a_pose.position.x, a_pose.position.y, a_pose.position.z);
+            continue;
+        }
+        double min_difference = std::numeric_limits<double>::max();
+        std::vector<double> selected_solution;
+
+        for (const auto& solution : ik_srv.response.joint_solutions) {
+            // Restringir el ángulo del `shoulder_lift_joint` (índice 2) a [-π/2, π/2]
+            if (solution.joint_angles[2] < -M_PI_2 || solution.joint_angles[2] > M_PI_2) {
+                continue; // Ignorar soluciones fuera del rango permitido
+            }
+
+            // Calcular la diferencia total con el estado actual
+            double difference = 0.0;
+            for (size_t i = 0; i < solution.joint_angles.size(); ++i) {
+                difference += std::abs(solution.joint_angles[i] - current_joint_states.position[i]);
+            }
+
+            // Seleccionar la solución con menor diferencia
+            if (difference < min_difference) {
+                min_difference = difference;
+                selected_solution = std::vector<double>(solution.joint_angles.begin(), solution.joint_angles.end());
+            }
+        }
+
+        if (selected_solution.empty()) {
+            ROS_WARN("No suitable IK solution found for pose (%.2f, %.2f, %.2f)", 
+                     a_pose.position.x, a_pose.position.y, a_pose.position.z);
+            continue;
+        }
+
+        // Generar trayectoria
+        trajectory_msgs::JointTrajectory joint_trajectory;
+        joint_trajectory.joint_names = joint_names;
+
+        // Punto inicial: Estado actual del UR10
+        trajectory_msgs::JointTrajectoryPoint start_point;
+        start_point.positions = current_joint_states.position;
+        start_point.time_from_start = ros::Duration(0.0);
+
+        // Punto final: Solución IK
+        trajectory_msgs::JointTrajectoryPoint goal_point;
+        goal_point.positions = std::vector<double>(ik_srv.response.joint_solutions[0].joint_angles.begin(),
+                                           ik_srv.response.joint_solutions[0].joint_angles.end());
+
+        goal_point.time_from_start = ros::Duration(2.0); // 2 segundos para moverse
+
+        joint_trajectory.points.push_back(start_point);
+        joint_trajectory.points.push_back(goal_point);
+
+
+        // Preparar la trayectoria
+        std::vector<std::vector<double>> trajectory_points = {
+            current_joint_states.position, // Punto inicial
+            selected_solution              // Punto final
+        };
+        sendTrajectory(joint_names, trajectory_points);
+
+        // Publicar la trayectoria
+        joint_trajectory.header.stamp = ros::Time::now();
+        trajectory_pub.publish(joint_trajectory);
+
+        ROS_INFO("Published trajectory to pose (%.2f, %.2f, %.2f)", 
+                 a_pose.position.x, a_pose.position.y, a_pose.position.z);
+
+        // Esperar hasta que el UR10 esté estacionario
+        ros::Rate rate(10); // 10 Hz
+        while (ros::ok()) {
+            if (isArmStationary(current_joint_states)) {
+                ROS_INFO("UR10 has reached pose (%.2f, %.2f, %.2f)", 
+                         a_pose.position.x, a_pose.position.y, a_pose.position.z);
+                break;
+            }
+            rate.sleep();
+        }
     }
 }
 
