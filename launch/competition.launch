@@ -77,8 +77,9 @@
        <!-- Include the IK service -->
     <include file="$(find ik_service)/launch/ik_service.launch" />
 
+     <param name="use_sim_time" value="true"/>
+  
  
-    
     <!-- Lanzar el nodo competition_controller_node -->
     <node name="competition_controller_node" pkg="ariac_entry" type="competition_controller_node" output="screen">
        
