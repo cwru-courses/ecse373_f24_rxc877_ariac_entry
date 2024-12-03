@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(ariac_entry)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++11)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -13,6 +13,12 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rviz
   std_srvs
+  osrf_gear
+  genmsg 
+  actionlib_msgs
+  control_msgs
+  actionlib
+  
 )
 
 ## System dependencies are found with CMake's conventions
@@ -62,6 +68,8 @@ find_package(catkin REQUIRED COMPONENTS
 #   Service2.srv
 # )
 
+# add_action_files(DIRECTORY action FILES FollowJointTrajectory.action)
+
 ## Generate actions in the 'action' folder
 # add_action_files(
 #   FILES
@@ -70,10 +78,11 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  std_msgs  # Or other packages containing msgs
+  actionlib_msgs
+ )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -137,6 +146,10 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/ariac_entry_node.cpp)
 add_executable(competition_controller_node src/competition_controller_node.cpp)
+add_dependencies(competition_controller_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(competition_controller_node ${catkin_LIBRARIES})
+
+
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

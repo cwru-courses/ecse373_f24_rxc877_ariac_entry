@@ -1,27 +1,14 @@
 <launch>
 
 
-
-    
-    <!-- Lanzar la cámara lógica (si es necesario) 
-    <node name="logical_camera_bin1" pkg="osrf_gear" type="logical_camera" output="screen">
-        <param name="camera_frame" value="logical_camera_bin1_frame"/>
-    </node>
-
-    <node name="logical_camera_bin2" pkg="osrf_gear" type="logical_camera" output="screen">
-        <param name="camera_frame" value="logical_camera_bin2_frame"/>
-    </node>
-
-    <node name="logical_camera_agv1" pkg="osrf_gear" type="logical_camera" output="screen">
-        <param name="camera_frame" value="logical_camera_agv1_frame"/>
-    </node>
-
-    <node name="logical_camera_agv2" pkg="osrf_gear" type="logical_camera" output="screen">
-        <param name="camera_frame" value="logical_camera_agv2_frame"/>
-    </node>
---> 
-    <!-- Puedes agregar más cámaras según sea necesario --> 
-     
+<node name="competition_controller_node" pkg="ariac_entry" type="competition_controller_node" output="screen">
+  <param name="wait_for_service" value="/ariac/start_competition" />
+</node>
+   
+ <arg name="use_ik_client" default="false" />
+<node if="$(arg use_ik_client)" name="ik_client_node" pkg="ik_service" type="ik_client" output="screen">
+    <!-- Opcionalmente, parámetros del nodo -->
+</node>    
       <!-- Arguments from ecse_373_ariac.launch -->
     <arg name="python" default="true" doc="Whether to use the python scripts [true|false]" />
 
@@ -54,6 +41,7 @@
     <arg name="trial" default="$(find ecse_373_ariac)/config/$(arg trial_file)" />
     <arg name="environ_file" default="environment_config.yaml" />
     <arg name="environ" default="$(find ecse_373_ariac)/config/$(arg environ_file)" />
+    
 
     <!-- Include ecse_373_ariac.launch -->
     <include file="$(find ecse_373_ariac)/launch/ecse_373_ariac.launch">
@@ -81,10 +69,9 @@
   
  
     <!-- Lanzar el nodo competition_controller_node -->
-    <node name="competition_controller_node" pkg="ariac_entry" type="competition_controller_node" output="screen">
+
        
-       
-    </node>
+    
 
    
     <!-- Otros nodos de servicios si son necesarios -->

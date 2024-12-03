@@ -28,10 +28,24 @@
 #include <trajectory_msgs/JointTrajectory.h>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
 
-#include <control_msgs/FollowJointTrajectoryAction.h>
 #include <actionlib/client/simple_action_client.h>
 
 #include "sensor_msgs/JointState.h"
+
+// Action Server headers
+#include "actionlib/client/simple_action_client.h"
+#include "actionlib/client/terminal_state.h"
+// The Action Server "message type"
+#include "control_msgs/FollowJointTrajectoryAction.h"
+#include "control_msgs/FollowJointTrajectoryActionGoal.h"
+#include "control_msgs/JointTrajectoryFeedback.h"
+#include "control_msgs/FollowJointTrajectoryResult.h"
+
+#include <std_msgs/Header.h>
+
+// Instantiate the Action Server client
+
+// The header and goal (not the tolerances) of the action must be filled.
 
 
 struct DetectedPart {
@@ -59,13 +73,44 @@ std::map<std::string, osrf_gear::LogicalCameraImage> logical_camera_data;
 tf2_ros::Buffer tfBuffer;
 tf2_ros::TransformListener tfListener(tfBuffer);
 
+actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> trajectory_ac("ariac/arm/follow_joint_trajectory", true);
+
+
+
+
+
+void goalActiveCallback() {
+    ROS_INFO("Goal has been activated!");
+}
+
+void feedbackCallback(const boost::shared_ptr<const control_msgs::FollowJointTrajectoryFeedback>& feedback) {
+    ROS_INFO_STREAM("Current arm state: " ); // desirde actual or error
+}
+
+void resultCallback(const actionlib::SimpleClientGoalState& state, const control_msgs::FollowJointTrajectoryResultConstPtr& res) {
+  ROS_INFO("Action complete.");
+    }
+
+
+
 // Sart the competition by calling the service client
 bool startCompetition(ros::NodeHandle &nh) {
     ros::ServiceClient begin_client = nh.serviceClient<std_srvs::Trigger>("/ariac/start_competition");
     std_srvs::Trigger begin_comp;
 
     ROS_INFO("Waiting for /ariac/start_competition service...");
-    ros::service::waitForService("/ariac/start_competition");
+     int retries = 0;
+    const int max_retries = 10;  // Número máximo de intentos
+    while (!begin_client.exists() && retries < max_retries) {
+        ROS_INFO("Service not available yet. Retrying... (%d/%d)", retries + 1, max_retries);
+        ros::Duration(2.0).sleep();  // Espera 2 segundos antes de volver a intentar
+        retries++;
+    }
+
+    if (retries == max_retries) {
+        ROS_ERROR("Failed to find /ariac/start_competition service after multiple attempts.");
+        return false;
+    }
 
     if (begin_client.call(begin_comp)) {
         if (begin_comp.response.success) {
@@ -137,16 +182,16 @@ bool transformPartPose(const std::string& camera_frame,
 // Funtion to subscribe to all camera
 void subscribeToCameras(ros::NodeHandle &nh) {
     std::vector<std::string> camera_topics = {
-        "/ariac/logical_camera_bin1",
-        "/ariac/logical_camera_bin2",
-        "/ariac/logical_camera_bin3",
-        "/ariac/logical_camera_bin4",
-        "/ariac/logical_camera_bin5",
-        "/ariac/logical_camera_bin6",
-        "/ariac/logical_camera_bin7",
-        "/ariac/logical_camera_bin8",
-        "/ariac/logical_camera_agv1",
-        "/ariac/logical_camera_agv2"
+        "/ariac/bin1",
+        "/ariac/bin2",
+        "/ariac/bin3",
+        "/ariac/bin4",
+        "/ariac/bin5",
+        "/ariac/bin6",
+        "/ariac/bin7",
+        "/ariac/bin8",
+        "/ariac/agv1",
+        "/ariac/agv2"
     };
 
     for (const auto& topic : camera_topics) {
@@ -266,10 +311,10 @@ bool callIKService(ros::ServiceClient &ik_client, ik_service::PoseIK &ik_srv)
 
 void sendTrajectory(const std::vector<std::string> &joint_names,ros::Publisher& trajectory_pub,
                     const std::vector<double> &joint_positions) {
-    actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> arm_client("arm_controller/follow_joint_trajectory", true);
+    //actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> arm_client("arm_controller/follow_joint_trajectory", true);
 
-    ROS_INFO("Waiting Action Server...");
-    arm_client.waitForServer();
+    //ROS_INFO("Waiting Action Server...");
+    //arm_client.waitForServer();
 
     // Crear el mensaje de trayectoria
     trajectory_msgs::JointTrajectory traj;
@@ -319,6 +364,26 @@ bool isArmStationary(const sensor_msgs::JointState& joint_states) {
     return true; // El brazo está estacionario
 }
 
+// void goalActiveCallback() { 
+//     ROS_INFO("The goal is active");
+// }
+
+// void feedbackCallback(const control_msgs::JointTrajectoryFeedbackConstPtr& fb) {
+//     ROS_INFO("Feedback recived ");
+//     for (size_t i = 0; i < fb->joint_names.size(); ++i) {
+//         ROS_INFO("  Joint: %s,  Psition: %f", fb->joint_names[i].c_str(), fb->actual.positions[i]);
+//     }
+// }
+
+// void resultCallback(const actionlib::SimpleClientGoalState& state,
+//                     const control_msgs::JointTrajectoryResultConstPtr& res) {
+//     ROS_INFO("The action is complete %s", state.toString().c_str());
+//     if (res) {
+//         ROS_INFO("Result %d .", res->trajectory.points.size());
+//     } else {
+//         ROS_WARN("No result.");
+//     }
+// }
 // Function to create target poses
 std::vector<geometry_msgs::Pose> createTargetPoses()
 {
@@ -331,50 +396,55 @@ std::vector<geometry_msgs::Pose> createTargetPoses()
     pose.position.x = 0.75;
     pose.position.y = 0.0;
     pose.position.z = 0.95;
-    pose.orientation.w = 1.0;
+    
     pose.orientation.x = 0.0;
     pose.orientation.y = 0.0;
     pose.orientation.z = 0.0;
+    pose.orientation.w = 1.0;
     poses.push_back(pose);
 
     // Pose 2
     pose.position.x = 0.0;
     pose.position.y = 0.75;
     pose.position.z = 0.95;
-    pose.orientation.w = 1.0;
+    
     pose.orientation.x = 0.0;
     pose.orientation.y = 0.0;
     pose.orientation.z = 0.0;
+    pose.orientation.w = 1.0;
     poses.push_back(pose);
 
     // Pose 3
     pose.position.x = 0.25;
     pose.position.y = 0.75;
     pose.position.z = 0.95;
-    pose.orientation.w = 1.0;
+    
     pose.orientation.x = 0.0;
     pose.orientation.y = 0.0;
     pose.orientation.z = 0.0;
+    pose.orientation.w = 1.0;
     poses.push_back(pose);
 
     // Pose 4
     pose.position.x = 0.75;
     pose.position.y = 0.25;
     pose.position.z = 0.95;
-    pose.orientation.w = 1.0;
+    
     pose.orientation.x = 0.0;
     pose.orientation.y = 0.0;
     pose.orientation.z = 0.0;
+    pose.orientation.w = 1.0;
     poses.push_back(pose);
 
     // Pose 5
     pose.position.x = 0.75;
     pose.position.y = 0.45;
     pose.position.z = 0.75;
-    pose.orientation.w = 1.0;
+    
     pose.orientation.x = 0.0;
     pose.orientation.y = 0.0;
     pose.orientation.z = 0.0;
+    pose.orientation.w = 1.0;
     poses.push_back(pose);
 
     return poses;
@@ -383,7 +453,13 @@ std::vector<geometry_msgs::Pose> createTargetPoses()
 
 void moveToPoses(ros::NodeHandle &nh,  tf2_ros::Buffer& tfBuffer,  ros::Publisher trajectory_pub) {
     // Obtener las poses objetivo
+    //control_msgs::FollowJointTrajectoryGoal goal;
     std::vector<geometry_msgs::Pose> poses = createTargetPoses();
+
+    
+    //control_msgs::FollowJointTrajectoryGoal goal;
+
+
     //Ik service client 
     ros::ServiceClient ik_client = nh.serviceClient<ik_service::PoseIK>("pose_ik");
     // Obtener nombres de las juntas
@@ -393,6 +469,7 @@ void moveToPoses(ros::NodeHandle &nh,  tf2_ros::Buffer& tfBuffer,  ros::Publishe
         return;
     }
 
+    
     // Preparar solicitud al servicio IK
     // ik_service::PoseIK ik_srv;
     // ik_srv.request.target_pose = a_pose;
@@ -425,6 +502,7 @@ void moveToPoses(ros::NodeHandle &nh,  tf2_ros::Buffer& tfBuffer,  ros::Publishe
                                   ik_srv.response.joint_solutions[0].joint_angles.end());
 
         
+
         sendTrajectory(joint_names,trajectory_pub,joint_angles);
         // Wait for the arm to reach the pose
         ros::Rate rate(10); // 10 Hz
@@ -435,6 +513,7 @@ void moveToPoses(ros::NodeHandle &nh,  tf2_ros::Buffer& tfBuffer,  ros::Publishe
                                 [](double vel) { return std::abs(vel) < 0.01; })) {
                     ROS_INFO("Arm has reached pose (%.2f, %.2f, %.2f).", 
                              target_pose.position.x, target_pose.position.y, target_pose.position.z);
+                      //feedbackCallback(goal);       
                     break;
                 }
             }
@@ -444,6 +523,7 @@ void moveToPoses(ros::NodeHandle &nh,  tf2_ros::Buffer& tfBuffer,  ros::Publishe
        
         
     }
+  
 }
 
 
@@ -523,7 +603,7 @@ bool transformPoseToArmFrame(const geometry_msgs::Pose &camera_pose, const std::
     }
 }
 
-void publishTrajectory(const sensor_msgs::JointState& joint_states,ros::Publisher& trajectory_pub) {
+void publishTrajectory(sensor_msgs::JointState& joint_states, ros::Publisher& trajectory_pub) {
     trajectory_msgs::JointTrajectory joint_trajectory;
 
     // Nombres de las juntas
@@ -564,10 +644,31 @@ void publishTrajectory(const sensor_msgs::JointState& joint_states,ros::Publishe
     joint_trajectory.header.stamp = ros::Time::now();
     joint_trajectory.header.frame_id = "arm1_base_link";
 
-    // Publicar la trayectoria
+    sensor_msgs::JointState joint_state;
+    joint_state.header.stamp = ros::Time::now();
+    joint_state.name = joint_trajectory.joint_names;
+    joint_state.position = joint_trajectory.points[0].positions;// Publicar la trayectoria
     ROS_INFO("Publicando trayectoria...");
     trajectory_pub.publish(joint_trajectory);
+    
+// Crear el objetivo (Goal) para el Action Server
+    control_msgs::FollowJointTrajectoryGoal goal;
+    goal.trajectory.header.stamp = ros::Time::now();
+    goal.trajectory.header.frame_id = "base_link";  // El marco de referencia puede variar
+
+    // Llenar la trayectoria con las posiciones de las articulaciones
+    goal.trajectory.points.resize(1);  // Solo un punto en este ejemplo
+    goal.trajectory.points[0].positions.push_back(1.57);  // Ejemplo: posición para la articulación 1 (en radianes)
+    goal.trajectory.points[0].time_from_start = ros::Duration(3.0);  // Tiempo para alcanzar este punto
+
+    // Enviar el objetivo al Action Server con los callbacks
+    trajectory_ac.sendGoal(goal, &resultCallback, &goalActiveCallback, &feedbackCallback);
+
+    // Esperar hasta que el objetivo esté completo
+    trajectory_ac.waitForResult();
+    ROS_INFO("Final state: %s", trajectory_ac.getState().toString().c_str());
 }
+
 
 
 
@@ -579,6 +680,7 @@ void processOrders(ros::NodeHandle &nh, ros::ServiceClient &ik_client,  ros::Pub
     const double WRIST_2_NEAR_PI_2 = M_PI / 2;      // Cerca de π/2
     const double WRIST_2_NEAR_3PI_2 = 3 * M_PI / 2; // Cerca de 3π/2
     const double WRIST_2_TOLERANCE = 0.1;           // Tolerancia para wrist_2
+    
     // Retrieve joint names from parameter server
     std::vector<std::string> joint_names;
     if (!retrieveJointNames(joint_names)) {
@@ -686,6 +788,7 @@ void processOrders(ros::NodeHandle &nh, ros::ServiceClient &ik_client,  ros::Pub
                                                    [](double vel) { return std::abs(vel) < 0.01; });
                       if (arm_at_rest) {
                         ROS_INFO("Robot arm has reached the target position for product type: %s", product.type.c_str());
+                        //resultCallback(actionlib, goal);
                         break;
                     }
                     rate.sleep();
@@ -709,8 +812,15 @@ void processOrders(ros::NodeHandle &nh, ros::ServiceClient &ik_client,  ros::Pub
 
 int main(int argc, char **argv) {
     // Inicializar el nodo ROS
+   // ROS_INFO("Hola");
     ros::init(argc, argv, "competition_controller_node");
     ros::NodeHandle nh;
+    
+    // Call the startCompetition function and handle success or failure
+    if (!startCompetition(nh)) {
+        ROS_ERROR("Unable to start '/ariac/start_competition'. Shutting down node.");
+        ros::shutdown();
+    }
 
     order_vector.clear();
     product_locations.clear();
@@ -731,11 +841,7 @@ int main(int argc, char **argv) {
     ROS_INFO("'/ariac/start_competition' service is starting please wait!");
     ros::service::waitForService("/ariac/start_competition");
 
-    // Call the startCompetition function and handle success or failure
-    if (!startCompetition(nh)) {
-        ROS_ERROR("Unable to start '/ariac/start_competition'. Shutting down node.");
-        ros::shutdown();
-    }
+  
 
     tf2_ros::Buffer tfBuffer;
     
@@ -743,11 +849,26 @@ int main(int argc, char **argv) {
     ros::Subscriber order_subscriber = nh.subscribe("/ariac/orders", 10, orderCallback);
     // Suscribirse a las cámaras lógicas
     subscribeToCameras(nh);
-
+ROS_INFO("Hola despues de suscribir camaras");
       if (!waitForIKService("pose_ik", 10000)) {
         ROS_ERROR("IK service is unavailable. Exiting...");
         return 1; // Exit if the IK service is not ready
       }
+    trajectory_ac.waitForServer();
+    ROS_INFO("Connected to action server.");
+
+    // // Ahora puedes enviar objetivos de acción
+    // trajectory_msgs::JointTrajectory joint_trajectory;
+    // // Aquí, deberías llenar el joint_trajectory con las posiciones de las juntas
+
+    // publishTrajectory(joint_trajectory); 
+    trajectory_msgs::JointTrajectory joint_trajectory;
+    // Inicializar `joint_trajectory` 
+
+    sensor_msgs::JointState joint_states;
+    joint_states.name = joint_trajectory.joint_names;
+    joint_states.position = joint_trajectory.points[0].positions; // Usa el primer punto
+    
 
     // Definir el publisher para las trayectorias
     ros::Publisher trajectory_pub = nh.advertise<trajectory_msgs::JointTrajectory>("/ariac/arm1/arm/command", 10);
@@ -758,7 +879,7 @@ int main(int argc, char **argv) {
     // Cliente para el servicio IK
     ros::ServiceClient ik_client = nh.serviceClient<ik_service::PoseIK>("pose_ik");
 
-
+    publishTrajectory(joint_states, trajectory_pub);
 
     
     //
@@ -800,7 +921,7 @@ int main(int argc, char **argv) {
     // Llamar a moveToPoses para mover el brazo a las posiciones objetivo
     moveToPoses(nh, tfBuffer, trajectory_pub);
 
-    ros::spinOnce();
+    //ros::spinOnce();
     // Procesar órdenes
     processOrders(nh, ik_client, trajectory_pub);
 
