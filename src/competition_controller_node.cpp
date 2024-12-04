@@ -70,12 +70,12 @@ std::map<std::string, std::vector<DetectedPart>> product_locations;
 std::map<std::string, osrf_gear::LogicalCameraImage> logical_camera_data;
 
 // Buffer and Listener for tf2 transfromation 
-tf2_ros::Buffer tfBuffer;
-tf2_ros::TransformListener tfListener(tfBuffer);
+// tf2_ros::Buffer tfBuffer;
+// tf2_ros::TransformListener tfListener(tfBuffer);
 
 actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> trajectory_ac("ariac/arm/follow_joint_trajectory", true);
 
-
+ std::mutex data_mutex; 
 
 
 
@@ -126,7 +126,7 @@ bool startCompetition(ros::NodeHandle &nh) {
     }
  
 }
-std::mutex data_mutex; 
+
 
 // Callback to subscribe to the order's topic 
 void orderCallback(const osrf_gear::Order::ConstPtr& msg) {
@@ -153,7 +153,7 @@ void logicalCameraCallback(const osrf_gear::LogicalCameraImage::ConstPtr& msg, c
 }
 
 // Function to transform the position of the product 
-bool transformPartPose(const std::string& camera_frame, 
+bool transformPartPose(const std::string& camera_frame, tf2_ros::Buffer& tfBuffer,
                        const geometry_msgs::Pose& part_pose, 
                        geometry_msgs::PoseStamped& goal_pose) {
     geometry_msgs::PoseStamped part_pose_stamped;
@@ -673,7 +673,7 @@ void publishTrajectory(sensor_msgs::JointState& joint_states, ros::Publisher& tr
 
 
 // Process the orders
-void processOrders(ros::NodeHandle &nh, ros::ServiceClient &ik_client,  ros::Publisher trajectory_pub) {
+void processOrders(ros::NodeHandle &nh, ros::ServiceClient &ik_client,  ros::Publisher trajectory_pub, tf2_ros::Buffer& tfBuffer) {
     // Definir restricciones de ángulos de las juntas
     const double SHOULDER_LIFT_MIN = -M_PI / 4;     // -45 grados
     const double SHOULDER_LIFT_MAX = M_PI / 4;      // +45 grados
@@ -815,12 +815,16 @@ int main(int argc, char **argv) {
    // ROS_INFO("Hola");
     ros::init(argc, argv, "competition_controller_node");
     ros::NodeHandle nh;
-    
+
+   
     // Call the startCompetition function and handle success or failure
     if (!startCompetition(nh)) {
         ROS_ERROR("Unable to start '/ariac/start_competition'. Shutting down node.");
         ros::shutdown();
     }
+    
+    tf2_ros::Buffer tfBuffer;
+    tf2_ros::TransformListener tfListener(tfBuffer); 
 
     order_vector.clear();
     product_locations.clear();
@@ -843,9 +847,7 @@ int main(int argc, char **argv) {
 
   
 
-    tf2_ros::Buffer tfBuffer;
-    
-    tf2_ros::TransformListener tfListener(tfBuffer);
+
     ros::Subscriber order_subscriber = nh.subscribe("/ariac/orders", 10, orderCallback);
     // Suscribirse a las cámaras lógicas
     subscribeToCameras(nh);
@@ -923,7 +925,7 @@ ROS_INFO("Hola despues de suscribir camaras");
 
     //ros::spinOnce();
     // Procesar órdenes
-    processOrders(nh, ik_client, trajectory_pub);
+    processOrders(nh, ik_client, trajectory_pub, tfBuffer);
 
     ROS_INFO("Finalizando el nodo.");
     return 0;
