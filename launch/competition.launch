@@ -7,6 +7,11 @@
    
  <arg name="use_ik_client" default="false" />
 <node if="$(arg use_ik_client)" name="ik_client_node" pkg="ik_service" type="ik_client" output="screen">
+
+<param name="robot_description" command="$(find xacro)/xacro.py '$(find your_package)/urdf/your_robot.xacro'" />
+<node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" />
+
+    
     <!-- Opcionalmente, parámetros del nodo -->
 </node>    
       <!-- Arguments from ecse_373_ariac.launch -->
