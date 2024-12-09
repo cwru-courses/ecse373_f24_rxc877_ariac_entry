@@ -279,12 +279,13 @@ void jointStatesCallback(const sensor_msgs::JointState::ConstPtr& msg) {
 
     // Update the global variable with the latest joint state information
     joint_states = *msg;
+    //ROS_INFO("Received joint states: %lu joints.", msg->name.size());
 
     // Optional: Add a log statement to debug joint state updates (throttled to avoid flooding)
-    ROS_INFO_STREAM_THROTTLE(10, "Callback executed. First joint: "
-                             << joint_states.name[0] << ", position: " << joint_states.position[0]);
+//     ROS_INFO_STREAM_THROTTLE(10, "Callback executed. First joint: "
+//                              << joint_states.name[0] << ", position: " << joint_states.position[0]);
+// }
 }
-
 // Call IK service with a retry mechanism if service is temporarily unavailable
 bool callIKService(ros::ServiceClient &ik_client, ik_service::PoseIK &ik_srv)
 {
@@ -338,7 +339,10 @@ void sendTrajectory(const std::vector<std::string> &joint_names,ros::Publisher& 
                 return;
             }
         }
+        start_point.positions = joint_states.position;
         start_point.time_from_start = ros::Duration(0.0);
+
+        //ROS_INFO("Received %lu IK solutions.", ik_srv.response.joint_solutions.size());
 
         // Set target point to IK solution
         target_point.positions = joint_positions;
@@ -492,7 +496,7 @@ void moveToPoses(ros::NodeHandle &nh,  tf2_ros::Buffer& tfBuffer,  ros::Publishe
     for (const auto &target_pose : poses) {
         ik_service::PoseIK ik_srv;
         ik_srv.request.target_pose = target_pose;
-
+        ROS_INFO("This is the target pose (%.2f, %.2f, %.2f)", target_pose.position.x, target_pose.position.y, target_pose.position.z);
         if(!callIKService(ik_client,ik_srv)){
             ROS_WARN("Skipping pose (%.2f, %.2f, %.2f) due to IK failure.", 
                      target_pose.position.x, target_pose.position.y, target_pose.position.z);
@@ -609,17 +613,19 @@ void publishTrajectory(trajectory_msgs::JointTrajectory &joint_trajectory) {
     ROS_INFO("DEntro de publish trajectory");
     joint_trajectory.joint_names = joint_names;
     joint_trajectory.points.resize(1); // Prepare for one waypoint
-
+    ros::Duration(1.0).sleep(); 
     // Create a variable to hold a single point
     trajectory_msgs::JointTrajectoryPoint point;
     point.positions.resize(joint_names.size(), 0.0);
+
     ROS_INFO("joint_trajectory.joint_names size: %lu", joint_trajectory.joint_names.size());
     ROS_INFO("joint_states.name size: %lu", joint_states.name.size());
     // Map current joint states to the waypoint
+    if (joint_states.name.empty()) {
+    ROS_WARN("No joint states received yet.");
+    }
     for (size_t t_joint = 0; t_joint < joint_trajectory.joint_names.size(); t_joint++) {
         for (size_t s_joint = 0; s_joint < joint_states.name.size(); s_joint++) {
-            
-
             if (joint_trajectory.joint_names[t_joint] == joint_states.name[s_joint]) {
                 point.positions[t_joint] = joint_states.position[s_joint];
                 break;
@@ -750,6 +756,7 @@ void processOrders(ros::NodeHandle &nh, ros::ServiceClient &ik_client,  ros::Pub
                     // Select the first valid solution
                     selected_solution = std::vector<double>(solution.begin(), solution.end());
                     valid_solution_found = true;
+                   
                     break;
                 }
 
@@ -757,7 +764,7 @@ void processOrders(ros::NodeHandle &nh, ros::ServiceClient &ik_client,  ros::Pub
                     ROS_WARN("No valid IK solution found for product type: %s", product.type.c_str());
                     continue;
                 }
-
+                ros::Time::now() + ros::Duration(0.1);
                 // Execute the selected IK solution by publishing a trajectory
                 sendTrajectory(joint_names, trajectory_pub, selected_solution, joint_states);
 
@@ -826,7 +833,7 @@ int main(int argc, char **argv) {
 
 
 
-    ros::Subscriber order_subscriber = nh.subscribe("/ariac/orders", 10, orderCallback);
+    //ros::Subscriber order_subscriber = nh.subscribe("/ariac/orders", 10, orderCallback);
     // Suscribirse a las cámaras lógicas
     subscribeToCameras(nh);
     ROS_INFO("Hola despues de suscribir camaras");
@@ -865,7 +872,11 @@ int main(int argc, char **argv) {
 
     // Suscriptor para los estados de las juntas
     ros::Subscriber joint_states_sub = nh.subscribe("/ariac/arm1/joint_states", 10, jointStatesCallback);
-
+if (joint_states_sub) {
+        ROS_INFO("Successfully subscribed to /ariac/arm1/joint_states.");
+    } else {
+        ROS_ERROR("Failed to subscribe to /ariac/arm1/joint_states.");
+    }
     // Cliente para el servicio IK
     ros::ServiceClient ik_client = nh.serviceClient<ik_service::PoseIK>("calculate_ik");
 //     if (!trajectory_ac.waitForServer(ros::Duration(30.0))) {
@@ -881,22 +892,24 @@ int main(int argc, char **argv) {
     //
     // cuanto llame initializeROS poner esto:
         // IK service client
-    ik_client = nh.serviceClient<ik_service::PoseIK>("calculate_ik");
-    ROS_INFO("Initialized IK service client for 'calculate_ik'.");
+    // ik_client = nh.serviceClient<ik_service::PoseIK>("calculate_ik");
+    // ROS_INFO("Initialized IK service client for 'calculate_ik'.");
 
-    // Publisher for sending joint trajectories
-    trajectory_pub = nh.advertise<trajectory_msgs::JointTrajectory>("/ariac/arm1/arm/command", 10);
-    ROS_INFO("Initialized joint trajectory publisher for '/ariac/arm1/arm/command'.");
+    // // Publisher for sending joint trajectories
+    // trajectory_pub = nh.advertise<trajectory_msgs::JointTrajectory>("/ariac/arm1/arm/command", 10);
+    // ROS_INFO("Initialized joint trajectory publisher for '/ariac/arm1/arm/command'.");
 
-    // Subscriber for joint states
-    joint_states_sub = nh.subscribe("/ariac/arm1/joint_states", 10, jointStatesCallback);
-    ROS_INFO("Initialized joint states subscriber for '/ariac/arm1/joint_states'.");
+    // // Subscriber for joint states
+    // joint_states_sub= nh.subscribe("/ariac/arm1/joint_states", 10, jointStatesCallback);
+    // ROS_INFO("Initialized joint states subscriber for '/ariac/arm1/joint_states'.");
+    ros::AsyncSpinner spinner(1); // Use 1 thread
+    spinner.start();
+    ROS_INFO("Async spinner started with 1 thread.");
+
+
     publishTrajectory(joint_trajectory); 
     ROS_INFO("He salido a publish trajectory");
     // Start the AsyncSpinner
-    static ros::AsyncSpinner spinner(1); // Use 1 thread
-    spinner.start();
-    ROS_INFO("Async spinner started with 1 thread.");
 
 
 
